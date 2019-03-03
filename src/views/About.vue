@@ -1,5 +1,11 @@
 <template>
-  <div class="about">
-    <h1>This is an about page</h1>
+  <div class="about" style="padding-top: 100px;">
+   <h2>This is About this App Page</h2>
   </div>
 </template>
+<script>
+export default{
+  
+}
+
+</script>

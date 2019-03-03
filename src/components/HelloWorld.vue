@@ -1,16 +1,38 @@
 <template>
   <div class="hello">
-    <h1>{{ msg }}</h1>
-   
+    <b-container class="bv-example-row">
+      <h3>{{msg}}</h3>
+      <b-row>
+        <b-col>
+          <b-list-group>
+            <b-list-group-item v-for="(item) in items" v-bind:key="item.index" class="d-flex justify-content-between align-items-center">
+              {{ item }}
+              <b-badge variant="primary" pill>{{ key }}</b-badge>
+            </b-list-group-item>
+        </b-list-group>
+        </b-col>
+        <b-col>2 of 2</b-col>
+      </b-row>
+    </b-container>   
   </div>
 </template>
 
 <script>
 export default {
-  name: 'HelloWorld',
+  data(){
+    return{
+      name: 'HelloWorld',
+      items:[],
+    }
+  },
+ 
   props: {
     msg: String
-  }
+  },
+
+  mounted() {
+    console.log(this.items)
+  },
 }
 </script>
 

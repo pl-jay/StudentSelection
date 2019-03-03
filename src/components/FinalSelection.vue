@@ -1,27 +1,38 @@
 <template>
 <div>
-
-<div>
-  <b-card class="text-center">
+  <b-card id="b-card">
 	  <div class="row">
-		   <div class="col-2"></div>
+			<div class="col-2"></div>
+			 <div class="col-4">
+			 <b-card>
+				 <div>
+					 <b-button block variant="primary" @click="confirmLimitList()"><strong>Confirm Limit List</strong></b-button>
+					 <br>
+					 <br>
+  					<b-button block variant="primary" @click="startSelection()"><strong>Start Selection</strong></b-button>
+					<b-button block variant="primary" @click="showLists()"><strong>Show Lists</strong></b-button>
+					<b-button block variant="primary" @click="genarateReports()"><strong>Generate Reports</strong></b-button>
+				</div>
+			 </b-card>
+		  </div>
+		   <!-- <div class="col-2"></div> -->
 		  <div class="col-4">
 			  <div class="text-light">
      			<div>
-    				<table class="table table-bordered table-info table-sm">
+    				<table class="table table-info table-sm">
   						<thead>
     						<tr>
-      							<th class="bg-success" scope="col">
+      							<th class="bg-info" scope="col" style="text-align: center; !important">
 									  <h6><strong>Degree Programme</strong></h6>
 								</th>
-      							<th class="bg-success" scope="col">
+      							<th class="bg-info" scope="col" style="text-align: center; !important">
 									  <h6><strong>Students Limit</strong></h6>
 								</th>
    							</tr>
   						</thead>
   						<tbody>
-    						<tr v-for="sbj in subject">
-      							<td><strong>{{ sbj.program }}</strong></td>
+    						<tr v-for="sbj in subjectList.subject" >
+      							<td style="text-align: center; !important"><strong>{{ sbj.program }}</strong></td>
       							<td><input class="form-control" type="number" v-model.number="sbj.limit"></td>
     						</tr>
   						</tbody>
@@ -29,252 +40,214 @@
   				</div>
     		</div>
 		  </div>
-
-		  <div class="col-4">
-			 <b-card>
-				 <div>
-  					<b-button block variant="primary">Start Selection</b-button>
-					<b-button block variant="primary">Show Lists</b-button>
-					<b-button block variant="primary">Generate Reports</b-button>
-				</div>
-			 </b-card>
-		  </div>
+			<div class="col-2"></div>
 	  </div>
   </b-card>
-</div>
 </div>
 </template>
 
 <script>
+
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+
 	export default{
 
 		data: function(){
-			return{
-				programe:    '',
-				list_no:     '',
-				std_limit:   '',
-                subjectid:   '',
-				
-				
-				subject:[
-					{Limit: '<b-form-input v-model.number="subject.limit" type="text" placeholder="Enter limit" />'}
-				],
-				
-				choosen_studentList:{},
-				final_List : [],
-
-				// Main Threee List
-				list1: {},
-				list2: {},
-				list3: {},
-
-				// Programme and limit
-				listOfStudentlimits:[],
-
+			return{				
+				subjectList:{
+					subject:{},
+				},
+				reports:['Whole List(sorted by ZScore)', 'Selected List', 'Unselected List'],
 				fields: ['program','Limit'],
+				reportList:[]
 			}
+		},
+
+		props:{
+			confirmbtn_bool: false,
 		},
 
 		mounted() {
 			var app = this;
-            axios.get('http://127.0.0.1:8000/api/ssu/subjectList')
-            .then(response => {
-                app.subject = response.data
-                console.log(app.subject)
-            })
+			
+			return new Promise((resolve) => {
+				let timerInterval
+				this.$swal({
+					title: 'Loading Data....',
+					toast: true,
+					timer: 3000,
+					allowOutsideClick: false,
+					onOpen: () => {
+						this.$swal.showLoading()
+					},
+					onClose: () => {
+						clearInterval(timerInterval)
+					}
+				}).then((result) => {
+						axios.get('subjectList')
+            		 .then(response => {
+									app.subjectList.subject = response.data
+									resolve();  
+								})
+			    })
+				setTimeout(() =>{	
+				}, 3000);
+			});
         },
 
-        methods:{
+    methods:{
 			
-			SubjectTable(){
-				var app = this;
-			console.log(app.subject)
-				axios.post('http://127.0.0.1:8000/api/ssu/fillSubjectTable', app.subjectList)
-					.then(response =>{
-						console.log(response.data)
-					})
+			confirmButton(){
+				this.confirmbtn_bool = true
 			},
 
-        	loadData(){
+			getAll(){
+				axios.get('http://127.0.0.1:8081/api/ssu/wholeList')
+						.then( res => {
+							console.log(res.data)
+						})
+			},
+			
+			confirmLimitList(){
+				var app = this;
 
-				// this will fill the three lists with prg, option & limit parameters
-        		var app = this;
+				var i = 0;
+				app.subjectList.subject.forEach(function (key, value) {
+					if(!app.subjectList.subject[value].limit){
+						i=i+1
+					}
+				})
+				if(!i){
+					
+					app.$swal.fire({
+  					title: 'Are you sure?',
+  					text: "This will update Students Limits Table",
+  					type: 'warning',
+						showCancelButton: true,
+						allowOutsideClick: false,
+						confirmButtonText: 'Confirm',
+						showLoaderOnConfirm: true,
 
-				// this will empty the final list array
-        		app.final_List = []
-        		console.log(app.subjectList.subject.length)
-        		for (var i = 0; i < app.subjectList.subject.length-1; i++) {
-        			
-        			var std_limit   = app.subjectList.subject[i].limit
-        			//var subj_id 	= app.subjectList.subject[i].choice_id
+							
+						preConfirm: (login) => {
+    				return axios.post('http://127.0.0.1:8081/api/ssu/fillSubjectTable', app.subjectList)
+      			.then(response => {
+        				if (response.ok) {
+          				throw new Error(response.statusText)
+								}
+        				return response
+      			})
+      			.catch(error => {
+       			 this.$swal.showValidationMessage(`Request failed: ${error}`)
+      			})
+  				},
+  				allowOutsideClick: () => !this.$swal.isLoading()
+					}).then((result) => {
+  				if (result.value) {
+    				this.$swal.fire({
+      				title: "Successfully Updated!",
+      				type:'success'
+    			})
+  				}
+				})
+				}else{
+					app.$swal.fire({
+  						title:'Please Fill the Limits Table',
+						type:'warning',
+						allowOutsideClick: false,
+					})
+				}
+				
+			},
+			startSelection(){
+				
+				this.$swal.fire({
+					title: 'Selection Process',
+					type:'info',
+					showCancelButton: true,
+  				confirmButtonText: 'Start process..',
+					showLoaderOnConfirm: true,
+					allowOutsideClick: false,
+					
+  				preConfirm: (login) => {
+    				return axios.post('http://127.0.0.1:8081/api/ssu/selection_process')
+      			.then(response => {
+        				if (response.ok) {
+          				throw new Error(response.statusText)
+								}
+								console.log(response)
+        				return response
+      			})
+      			.catch(error => {
+       			 this.$swal.showValidationMessage(`Request failed: ${error}`)
+      			})
+  				},
+  			allowOutsideClick: () => !this.$swal.isLoading()
+				}).then((result) => {
+  				if (result.value) {
+    				this.$swal.fire({
+      				title: "Selection Process Success !",
+      				type:'success'
+    			})
+  				}
+				})
 
-					var subj_id = app.subjectid                    
-        			console.log(std_limit,subj_id)
+			},
+			
+			showLists(){
+				 this.$router.push('/reportsView')
+			},
 
-        			axios.get('http://127.0.0.1:8000/api/ssu/test/'+ subj_id)
-        			 	.then(response =>{
-        			 		
-        			 		app.list1 = response.data[0]
-        			 		console.log('fill list 1',app.list1)
+			genarateReports(){
+				this.$swal.fire({
+					title: 'Select type of Report',
+					input: 'select',
+					inputOptions: this.reports,
+					showCancelButton: true,
+  				confirmButtonText: 'Generate',
+					showLoaderOnConfirm: true,
+					
+  				preConfirm: (login) => {
+    				return axios.get(`/reportResult/${login}`)
+      			.then(response => {
+        				if (response.ok) {
+          				throw new Error(response.statusText)
+								}
+								this.reportList = response.data
+								this.generatePDF()
+      			})
+      			.catch(error => {
+       			 this.$swal.showValidationMessage(`Request failed: ${error}`)
+      			})
+  				},
+  			allowOutsideClick: () => !this.$swal.isLoading()
+				}).then((result) => {
+  				if (result.value) {
+    				this.$swal.fire({
+      				title: "Report generation Success !",
+      				type:'success'
+    			})
+  				}
+				})
+			},
 
-        			 		app.list2 = response.data[1]
-        			 		console.log('fill list 2', app.list2)
-
-        			 		app.list3 = response.data[2]
-        			 		console.log('fill list 3', app.list3)
-
-
-        			 		this.selection_logic(std_limit)
-
-        			 	})
-
-        		}
-        	},
-
-
-        	selection_logic(limit){
-        		var app = this;
-        		
-        		var list1_length = app.list1.length;
-        		var list2_length = app.list2.length;
-        		var list3_length = app.list3.length;
-
-        		var due_no1,due_no2,due_no3;
-
-        		console.log('list1_length',app.list1.length)
-        		
-        		if(list1_length < limit){
-
-        			/* print out */
-					console.log('list1_lenght',list1_length)
-        			/* end */
-
-        			/* Array Operation */
-        			for (var i = 0; i <= list1_length-1; ++i) {
-        				app.final_List.push(app.list1[i])
-        			}
-        			
-        			due_no1 = limit - list1_length
-        			/* end */
-        			
-        			/* print out */
-						console.log('due_no1',due_no1)
-        			
-        				console.log('Final List first if', app.final_List)
-        			/* end */
-
-        			
-        			if(list2_length < due_no1){
-        				
-        				/* print out */
-        				console.log('list2_lenght',list2_length)
-        				/* end */
-
-        				/* Array Operation */
-        				
-        				for (var i = 0; i <= list2_length-1; ++i) {
-        					app.final_List.push(app.list2[i])
-        				}
-        				
-        				due_no2 = due_no1 - list2_length
-        				
-        				/* end */
-        				
-        				/* print out */
-        				console.log('Final List second if', app.final_List)
-        				console.log('due_no2',due_no2)
-        				/* end */
-
-        			
-        				if(list3_length < due_no2){
-        					
-        					/* print out */
-        					console.log('list3_lenght',list3_length)
-        					/* end */
-
-        					/* Array Operation */
-        					
-        					for (var i = 0; i <= list3_length-1; ++i) {
-        						app.final_List.push(app.list3[i])
-        					}
-
-        					due_no3 = due_no2 - list3_length
-        					/* end */
-
-        					/* print out */
-        					
-        					console.log('Final List third if', app.final_List)
-        					console.log('due_no3',due_no3)
-
-        					/* end */
-
-        				} else{
-        					/* print out */
-        					console.log('else of list3_length')
-        					/* end */
-
-
-        					/* Array Operation */
-        					
-        					for (var i = 0; i <= due_no2-1; ++i) {
-        						app.final_List.push(app.list3[i])
-        					}
-
-        					/* end */
-
-        					/* print out */
-        					
-        					console.log('Final List third if-else', app.final_List)
-        				
-        					/* end */
-
-        				}
-
-        			} else{
-        				
-
-        					/* Array Operation */
-        					
-        					for (var i = 0; i <= due_no1-1; ++i) {
-        						app.final_List.push(app.list2[i])
-        					}
-        					
-        					/* end */
-
-        					/* print out */
-        					
-        					console.log('Final List second if-else', app.final_List)
-        				
-        					/* end */
-
-        			}
-
-        		}else{
-        			/* Array Operation */
-        			
-        			for (var i = 0; i <= limit-1; ++i) {
-        				app.final_List.push(app.list1[i])
-        			}
-
-        			/* end */
-
-        			/* print out */
-        					
-        				console.log('Final List first if-else', app.final_List)
-        				
-        			/* end */
-        		}
-        	},
-
-
-        	confirm_list(para){
-        		var app = this;
-        		console.log('NIC', app.final_List[2].nic)
-        	},
-
-        	filterByALStream(){
-
-        	}
-        }
+			generatePDF(){
+            var app = this
+            let pdfName = 'test'
+            var doc = new jsPDF('l','pt', 'a3')
+						doc.autoTable({
+							//head:[['Name','NIC','Address1','Address2', 'Address3', 'zscore', 'AlStream','option1','option2','option3']],
+							body: app.reportList})
+            doc.save(pdfName + '.pdf')
+				}
+				
+    }
 	}
 </script>
+<style>
+#b-card{
+	    background-color: rgb(226, 229, 232);
+}
+    
+</style>
